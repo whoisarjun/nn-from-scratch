@@ -2,6 +2,7 @@ import pseudomath as math
 import pseudopillow as pillow
 
 LEARNING_RATE = 0.0001
+MOMENTUM_FACTOR = 0.9
 
 class DataLoader:
     def __init__(self, folder):
@@ -30,13 +31,16 @@ class Layer:
         self.weights = math.Matrix.rand((output_size, input_size))
         self.bias = math.Matrix.rand((output_size, 1))
         self.activation = None if activation == 'null' else getattr(math, activation)
+        self.antiactivation = None if activation == 'null' else getattr(math, activation + '_prime')
 
         self.prev_inputs = math.Matrix.const(0, (input_size, 1))
         self.this_outputs = math.Matrix.const(0, (output_size, 1))
 
-        # deltas for backprop
+        # deltas and velocities for backprop
         self.delta_W = math.Matrix.like(0, self.weights)
+        self.velocity_W = math.Matrix.like(0, self.weights)
         self.delta_b = math.Matrix.like(0, self.bias)
+        self.velocity_b = math.Matrix.like(0, self.bias)
         self.delta = math.Matrix.like(0, self.bias)
 
     def forward(self, input_vector: math.Matrix):
@@ -52,9 +56,12 @@ class Layer:
         self.delta_W = delta @ self.prev_inputs.transpose()
         self.delta_b = delta
 
+        self.velocity_W = self.velocity_W * MOMENTUM_FACTOR + self.delta_W * (1 - MOMENTUM_FACTOR)
+        self.velocity_b = self.velocity_b * MOMENTUM_FACTOR + self.delta_b * (1 - MOMENTUM_FACTOR)
+
     def apply_deltas(self):
-        self.weights -= self.delta_W * LEARNING_RATE
-        self.bias -= self.delta_b * LEARNING_RATE
+        self.weights -= self.velocity_W * LEARNING_RATE
+        self.bias -= self.velocity_b * LEARNING_RATE
 
     def __str__(self):
         string = 'Layer'
@@ -82,13 +89,11 @@ class Network:
 
     def backpropagate(self, predicted_vector: math.Matrix, actual_vector: math.Matrix, verbose=False):
         m, n = predicted_vector.dim()
-        self.cost = 0
-        for i in range(m):
-            for j in range(n):
-                self.cost += 0.5 * ((predicted_vector[i, j] - actual_vector[i, j]) ** 2)
+        true_id = actual_vector.argmax()
+        self.cost = -math.ln(predicted_vector[true_id, 0])
            
         if verbose:
-            print(f'Cost: {self.cost:.3f}')
+            print(f'Cost: {self.cost}')
 
         for i in range(self.layer_count - 1, -1, -1):
             layer = self.layers[i]
@@ -96,7 +101,7 @@ class Network:
                 delta = predicted_vector - actual_vector
             else:
                 next_layer = self.layers[i + 1]
-                delta = (next_layer.weights.transpose() @ next_layer.delta) * math.relu_prime(layer.this_outputs)
+                delta = (next_layer.weights.transpose() @ next_layer.delta) * layer.antiactivation(layer.this_outputs)
             layer.calc_deltas(delta)
 
         for layer in self.layers:

@@ -10,7 +10,7 @@ def print_progress(j, total, bar_length=30):
 model = torch.Network([
     torch.Layer(28*28, 16, activation='relu'),
     torch.Layer(16, 16, activation='relu'),
-    torch.Layer(16, 10)
+    torch.Layer(16, 10, activation='softmax')
 ])
 
 total_items = 10000
@@ -26,3 +26,9 @@ for epoch in range(epochs):
         target_vector[target, 0] = 1.
         model.backpropagate(result, target_vector)
     print(f'\nCost: {model.cost:.4f}\n')
+
+print('\n\n------------------ FINAL WEIGHTS ------------------\n')
+for layer in model.layers:
+    print(layer)
+    print(f'Weights: {layer.weights}')
+    print(f'Bias: {layer.bias}\n\n')

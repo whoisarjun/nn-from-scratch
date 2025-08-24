@@ -1,6 +1,18 @@
-# ========== CONSTANTS ==========
+# ========== CONSTANTS/FUNCTIONS ==========
 
 e = 2.718281828459045
+
+def ln(x):
+    if x <= 0:
+        raise ValueError("ln(x) undefined for x <= 0")
+    y = (x - 1) / (x + 1)
+    y2 = y * y
+    result = 0
+    power = y
+    for n in range(50):
+        result += power / (2 * n + 1)
+        power *= y2
+    return 2 * result
 
 # ========== RANDOMS ==========
 
@@ -35,6 +47,25 @@ class Matrix:
         m, n = self.dim()
         transposed = [[self.data[i][j] for i in range(m)] for j in range(n)]
         return Matrix(transposed)
+
+    # X.elementwise()
+    def elementwise(self, func: callable):
+        m, n = self.dim()
+        for i in range(m):
+            for j in range(n):
+                self[i, j] = func(self[i, j])
+        return self
+
+    # X.argmax()
+    def argmax(self):
+        m = self.dim()[0]
+        max_idx = 0
+        max_val = self[0, 0]
+        for i in range(1, m):
+            if self[i, 0] > max_val:
+                max_val = self[i, 0]
+                max_idx = i
+        return max_idx
 
     # X[i, j]
     def __getitem__(self, item: tuple[int, int]):
@@ -125,7 +156,7 @@ class Matrix:
         return self
 
     # X / c
-    def __div__(self, other):
+    def __truediv__(self, other):
         if isinstance(other, (int, float)):
             return Matrix([[i / other for i in row] for row in self.data])
         raise ValueError('Matrix addition only supports types int, float, or Matrix')
@@ -190,29 +221,23 @@ class Matrix:
 
 # ========== ACTIVATION FUNCTIONS ==========
 
+def _sigmoid_helper(n: int | float):
+    return 1 / (1 + e ** -n)
+
 def sigmoid(matrix: Matrix):
-    m, n = matrix.dim()
-    for i in range(m):
-        for j in range(n):
-            matrix[i, j] = 1 / (1 + e ** (-matrix[i, j]))
+    matrix = matrix.elementwise(_sigmoid_helper)
+    return matrix
+
+def sigmoid_prime(matrix: Matrix):
+    matrix = matrix.elementwise(lambda x: _sigmoid_helper(x) * (1 - _sigmoid_helper(x)))
     return matrix
 
 def relu(matrix: Matrix):
-    m, n = matrix.dim()
-    for i in range(m):
-        for j in range(n):
-            if matrix[i, j] < 0:
-                matrix[i, j] = 0
+    matrix = matrix.elementwise(lambda x: max(0, x))
     return matrix
 
 def relu_prime(matrix: Matrix):
-    m, n = matrix.dim()
-    for i in range(m):
-        for j in range(n):
-            if matrix[i, j] > 0:
-                matrix[i, j] = 1
-            else:
-                matrix[i, j] = 0
+    matrix = matrix.elementwise(lambda x: 1 if x > 0 else 0)
     return matrix
 
 def softmax(matrix: Matrix):
@@ -225,3 +250,19 @@ def softmax(matrix: Matrix):
     for i, n in enumerate(vector):
         vector[i] = n/summed
     return Matrix([[i] for i in vector])
+
+def softmax_prime(matrix: Matrix):
+    return matrix
+
+def _tanh_helper(n: int | float):
+    ex = e ** n
+    invex = 1 / ex
+    return (ex - invex) / (ex + invex)
+
+def tanh(matrix: Matrix):
+    matrix = matrix.elementwise(_tanh_helper)
+    return matrix
+
+def tanh_prime(matrix: Matrix):
+    matrix = matrix.elementwise(lambda x: 1 - (_tanh_helper(x) ** 2))
+    return matrix
